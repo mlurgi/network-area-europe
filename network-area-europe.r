@@ -1,3 +1,10 @@
+#################################################
+# Spatial networks 
+# 10 KM
+# 28/06/2016 Joao Braga
+#################################################
+# rm(list = ls())
+
 # Libraries
 library(raster)
 
@@ -85,7 +92,7 @@ head(master) # rows are individual pixels; 1st columm (PAGENAME) is the unique n
 
 # Convert a dbf table to raster
 # E.g. getting the spp "B122" distribution at @10k
-sppDIST <- data.frame(PAGENAME = master$PAGENAME, SPP = master$B258) # 1st Column: PAGENAME, necessary to match the pixels; 2nd can be any value, in here is presence and absence, but it can be network properties
+sppDIST <- data.frame(PAGENAME = master$PAGENAME, SPP = master$R82) # 1st Column: PAGENAME, necessary to match the pixels; 2nd can be any value, in here is presence and absence, but it can be network properties
 sppDIST$PAGENAME <- as.character(sppDIST$PAGENAME) # important: PAGENAME must be as character for this to work correctly
 str(sppDIST)
 
@@ -93,7 +100,7 @@ str(sppDIST)
 sppRaster <- fun.dbf2raster(SPPPA = sppDIST, mask.dir = "./mask10k/")
 sppRaster
 
-plot(sppRaster, main= whois(SPPCODE = "B258"))
+plot(sppRaster, main= whois(SPPCODE = "R84"))
 
 #################################################
 # Local webs (pixel level): sample of the metaweb for a given pixel species pool
@@ -498,10 +505,13 @@ links_per_sp <- c()
 
 visited_cells <- c()
 
-for(i in unique(shape@data$PK_UID)){
+regions_order <- c('macaronesia', 'mediterranean', 'anatolian', 'blackSea', 'continental', 'pannonian', 'alpine', 'atlantic', 'steppic', 'boreal', 'arctic')
+
+for(r in regions_order){
   
-  if(shape@data[which(shape@data$PK_UID == i),]$short_name %in% regions_to_remove) next;
+  if(r %in% regions_to_remove) next;
   
+  i <- which(shape@data$short_name == r)
   cur_pol <- shape[i,]
   region_name <- as.character(shape@data[which(shape@data$PK_UID == i),]$code)
   cur_ids <- extract(europeRaster, cur_pol)[[1]]
@@ -516,21 +526,22 @@ for(i in unique(shape@data$PK_UID)){
   plot(bioregion_raster, main=region_name)
   
   ### choose a random cell from the bioregion
-  cur_cellid <- sample(cur_codes, 1)
+  # cur_cellid <- sample(cur_codes, 1)
+  # 
+  # y_coord <- match(gsub("[0-9]", "", cur_cellid), latitudes);
+  # x_coord <- match(gsub("[A-Z]", "", cur_cellid), longitudes);
+  # 
+  # cells_to_traverse <- length(cur_codes) #rows*cols
+  # traversed_cells <- 1
   
-  y_coord <- match(gsub("[0-9]", "", cur_cellid), latitudes);
-  x_coord <- match(gsub("[A-Z]", "", cur_cellid), longitudes);
-
-  cells_to_traverse <- length(cur_codes) #rows*cols
-  traversed_cells <- 1
   
+  # traversed_set <- c()
   
-  traversed_set <- c()
-  
-  while(length(visited_cells) < cells_to_traverse){
-    print(traversed_cells)
-    cur_cellid <- paste0(latitudes[y_coord],longitudes[x_coord])
-    traversed_set <- append(traversed_set, cur_cellid)
+  # while(length(visited_cells) < cells_to_traverse){
+  for(cur_cellid in rev(cur_codes)){
+    # print(traversed_cells)
+    # cur_cellid <- paste0(latitudes[y_coord],longitudes[x_coord])
+    # traversed_set <- append(traversed_set, cur_cellid)
     
     skip <- FALSE
     
@@ -541,6 +552,8 @@ for(i in unique(shape@data$PK_UID)){
         cells_to_traverse <- cells_to_traverse - 1
       }
     }
+    
+    if(is.na(sum(master[which(master$PAGENAME == cur_cellid),-1]))) skip <- TRUE
     
     if(! skip){
       visited_cells <- append(visited_cells, cur_cellid)
@@ -564,16 +577,21 @@ for(i in unique(shape@data$PK_UID)){
       links <- append(links, ls)
       connectances <- append(connectances, (2*ls/((S-1)*S)))
       links_per_sp <- append(links_per_sp, ls/S)
+    
+    
+      if(length(visited_cells) %% 1000 == 0){
+        region$SPP <- 0
+        region[which(region$PAGENAME %in% visited_cells),]$SPP <- 1
+        
+        bioregion_raster <- fun.dbf2raster(SPPPA = region, mask.dir = "./mask10k/")
+        
+        plot(bioregion_raster, main='visited so far')
+      }
+      
     }
     
      
   }
-  
-  cur_out <- data.frame(region=rep(region_name, length(species)), area=1:length(species), species, links, links_per_sp, connectances)
-  
-  if(is.null(output)) output <- cur_out
-  else output <- rbind(output, cur_out)
-  
 }
 
 
@@ -937,7 +955,7 @@ par(mar=c(4,4,4,4))
 bins <- c(0,1,2,3,4,5,6,7,8,9,10,11)
 hist(table(species_regions$species_name), main='Distribution of regions per species', xlab='Number of regions per species', breaks=bins, xlim=c(0,12))
 
-output_netcarto <- mod_undirected[[1]]
+output_netcarto <- mod_undirected_no_hubs[[1]]
 
 output_netcarto$regions <- 0
 
