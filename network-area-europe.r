@@ -26,6 +26,7 @@ head(BARM.HAB)      # Format: rows are species codes; first column are species n
 # The values of each cell preference: 0 not suitable, 1 as secundary, 2 as primary habitat
 # You can check the correspondance for habitat codes in "habitat description and codes.xlsx"
 
+
 #################################################
 # Species codes and species names
 # Function to Identify a spp by the code
@@ -50,15 +51,6 @@ whois <- function(SPPCODE = NULL, SPPNAME = NULL) {
   return(who)
 }
 
-
-
-
-
-#################################################
-# Species presence/absence per pixel 
-# e.g. at @10km
-load(file = "MASTER.bin10000_allhab_tresh0.Rdata")
-head(master) # rows are individual pixels; 1st columm (PAGENAME) is the unique name of the pixel, other columns are species
 
 
 # Function to transform spp distribution (it can be network properties per pixel) into raster
@@ -100,6 +92,11 @@ whois(SPPCODE = "B122")
 
 whois(SPPNAME = "Falco")
 
+#################################################
+# Species presence/absence per pixel 
+# e.g. at @10km
+load(file = "MASTER.bin10000_allhab_tresh0.Rdata")
+head(master) # rows are individual pixels; 1st columm (PAGENAME) is the unique name of the pixel, other columns are species
 
 # Convert a dbf table to raster
 # E.g. getting the spp "B122" distribution at @10k
@@ -1111,5 +1108,3 @@ for(m in unique(output_netcarto$module)){
   pie(counts, labels = lbls, col=rainbow(length(lbls)),
       main=paste("Composition of regions in module", m+1))
 }
-
-# we should do here the community analysis that are in the linux version
