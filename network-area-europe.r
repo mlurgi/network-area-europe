@@ -36,7 +36,8 @@ whois <- function(SPPCODE = NULL, SPPNAME = NULL) {
   if(!is.null(SPPCODE) & !is.null(SPPNAME)) stop("Must specify a species code or name(Genus_species)")
   
   SppID <- read.table(file = "SppID.txt", header = TRUE, stringsAsFactors = F)
- 
+  
+  
   
   #### this should return something
   
