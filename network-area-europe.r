@@ -20,6 +20,14 @@ load(file = "BARMdiet_bin.RData")
 head(BARMdiet.binary)   # Format: rows are predators ;  columns are preys 
 
 #################################################
+# Species habitat preferences
+BARM.HAB <- read.csv("BARM_allhabs.csv",header = TRUE,row.names = 'ID',sep = ';')
+head(BARM.HAB)      # Format: rows are species codes; first column are species names, the rest are habitat. 
+# The values of each cell preference: 0 not suitable, 1 as secundary, 2 as primary habitat
+# You can check the correspondance for habitat codes in "habitat description and codes.xlsx"
+
+
+#################################################
 # Species codes and species names
 # Function to Identify a spp by the code
 whois <- function(SPPCODE = NULL, SPPNAME = NULL) {
@@ -69,12 +77,12 @@ fun.dbf2raster <- function(SPPPA, mask.dir = NULL){
   spp <- spp[cellID,] 
   spp$val <- SPPPA[,2]
   
-  xx <- values(maskk)
+  xx <- raster::values(maskk)
   
   if( length(xx[!is.na(xx)]) != nrow(spp)) stop("Mask size inadequate")
   xx[!is.na(xx)] <- spp$val    #[xx[!is.na(xx)]]
   
-  values(maskk) <- xx
+  raster::values(maskk) <- xx
   return(maskk)
 }
 
@@ -124,7 +132,28 @@ localWEB <- BARMdiet.binary[sppSTRING,sppSTRING] # Web adjacency matrix (predato
 dim(localWEB)
 # 241 241
 
+#################################################
+# Habitats per pixel. 
+# e.g. @ 10km spatial resolution (based on 300m x 300m GlobCover map, also included in the folder)
+pix.hab <- read.dbf(file = 'pixelHabs_10Km.dbf')
+head(pix.hab)
+# Format:
+# Rows are pixels @10km 
+# Columns:First is the pixel name, other are habitat types
+# Values are proportion of the 10km area occupied by each correspondent habitat
+
+# To be consistent with BARM.HAB habitat names
+names(pix.hab)[-1] <- sub(pattern = "VALUE_",replacement = "X",x = names(pix.hab)[-1]) 
+
+# Removal the habitat category 230 (no habitat)
+pix.hab <- pix.hab[,-42]                      
+
+# Removal habitats that are not present in spp x habs table (no information)
+pix.hab <- pix.hab[, c(1, which(names(pix.hab)%in% colnames(BARM.HAB)))]     
+
 # end
+
+# end of Joao Braga's code
 
 
 
@@ -237,11 +266,22 @@ links_per_sp <- c()
 
 total_cells <- length(master$PAGENAME)
 
+
+#### random sampling  === comment the following 2 lines for when circular sampling
+cells_order <- as.character(sample(master$PAGENAME))
+i <- 1
+
 while(length(visited_cells) < total_cells){
   print(traversed_cells)
- # print(paste('x = ',x_coord, ' --- y = ', y_coord,sep=''))
+  # print(paste('x = ',x_coord, ' --- y = ', y_coord,sep=''))
   
-  cur_cellid <- paste0(latitudes[y_coord],longitudes[x_coord])
+  
+  ####### for random aggregation
+  cur_cellid <- cells_order[i]
+  i <- i + 1
+  
+  ##### uncomment the line below for non-random sampling
+  #cur_cellid <- paste0(latitudes[y_coord],longitudes[x_coord])
   #print(cur_cellid)
   
   skip <- FALSE
@@ -258,7 +298,7 @@ while(length(visited_cells) < total_cells){
     visited_cells <- append(visited_cells, cur_cellid)
     
     cur_comm <- master[which(master$PAGENAME %in% visited_cells),]
-     
+    
     cur_comm <- colSums(cur_comm[-1])
     cur_comm[cur_comm > 1] <- 1
     sum(cur_comm)
@@ -278,32 +318,32 @@ while(length(visited_cells) < total_cells){
     links_per_sp <- append(links_per_sp, ls/S)
   }
   
-  if(x_count > 0){
-    x_index <- (x_index+x_offset)%%cols
-    x_coord <- x_index + 1
-    x_count <- x_count - 1
-    
-    if(x_count == 0){
-      x_next <- x_next + 1
-      if(x_offset == 1) x_offset = -1
-      else if(x_offset == -1) x_offset = 1
-      
-      y_count <- y_next
-      
-    }
-    
-  }else if(y_count > 0){
-    y_index <- (y_index + y_offset) %% rows
-    y_coord <- y_index + 1
-    y_count <- y_count - 1
-    
-    if(y_count == 0){
-      y_next <- y_next + 1
-      if(y_offset == 1) y_offset <- -1
-      else if(y_offset == -1) y_offset <- 1
-      x_count <- x_next
-    }
-  }
+  # if(x_count > 0){
+  #   x_index <- (x_index+x_offset)%%cols
+  #   x_coord <- x_index + 1
+  #   x_count <- x_count - 1
+  #   
+  #   if(x_count == 0){
+  #     x_next <- x_next + 1
+  #     if(x_offset == 1) x_offset = -1
+  #     else if(x_offset == -1) x_offset = 1
+  #     
+  #     y_count <- y_next
+  #     
+  #   }
+  #   
+  # }else if(y_count > 0){
+  #   y_index <- (y_index + y_offset) %% rows
+  #   y_coord <- y_index + 1
+  #   y_count <- y_count - 1
+  #   
+  #   if(y_count == 0){
+  #     y_next <- y_next + 1
+  #     if(y_offset == 1) y_offset <- -1
+  #     else if(y_offset == -1) y_offset <- 1
+  #     x_count <- x_next
+  #   }
+  # }
   
   traversed_cells <- traversed_cells + 1
   
@@ -353,7 +393,7 @@ regions_to_remove <- c('outside')
 output <- NULL
 
 #### and here we extract the cell values
-for(i in 5:5){
+for(i in shape@data$PK_UID){
   
   if(shape@data[which(shape@data$PK_UID == i),]$short_name %in% regions_to_remove) next;
   
@@ -373,7 +413,7 @@ for(i in 5:5){
   
   ### choose a random cell from the bioregion
   cur_cellid <- sample(cur_codes, 1)
-
+  
   y_coord <- match(gsub("[0-9]", "", cur_cellid), latitudes);
   x_coord <- match(gsub("[A-Z]", "", cur_cellid), longitudes);
   
@@ -507,6 +547,9 @@ visited_cells <- c()
 
 regions_order <- c('macaronesia', 'mediterranean', 'anatolian', 'blackSea', 'continental', 'pannonian', 'alpine', 'atlantic', 'steppic', 'boreal', 'arctic')
 
+#### This line is for going over the latitudinal gradient from north to south
+regions_order <- rev(regions_order)
+
 for(r in regions_order){
   
   if(r %in% regions_to_remove) next;
@@ -525,31 +568,17 @@ for(r in regions_order){
   
   plot(bioregion_raster, main=region_name)
   
-  ### choose a random cell from the bioregion
-  # cur_cellid <- sample(cur_codes, 1)
-  # 
-  # y_coord <- match(gsub("[0-9]", "", cur_cellid), latitudes);
-  # x_coord <- match(gsub("[A-Z]", "", cur_cellid), longitudes);
-  # 
-  # cells_to_traverse <- length(cur_codes) #rows*cols
-  # traversed_cells <- 1
   
+  ### uncomment this for south-to-north gradient
+  #for(cur_cellid in (rev(cur_codes))){
   
-  # traversed_set <- c()
-  
-  # while(length(visited_cells) < cells_to_traverse){
-  for(cur_cellid in rev(cur_codes)){
-    # print(traversed_cells)
-    # cur_cellid <- paste0(latitudes[y_coord],longitudes[x_coord])
-    # traversed_set <- append(traversed_set, cur_cellid)
-    
+  for(cur_cellid in ((cur_codes))){
     skip <- FALSE
     
     if((! cur_cellid %in% cur_codes) | (cur_cellid %in% visited_cells)) skip <- TRUE
     if(! skip){
       if(is.na(sum(master[which(master$PAGENAME == cur_cellid),-1]))){
         skip <- TRUE
-        cells_to_traverse <- cells_to_traverse - 1
       }
     }
     
@@ -577,9 +606,9 @@ for(r in regions_order){
       links <- append(links, ls)
       connectances <- append(connectances, (2*ls/((S-1)*S)))
       links_per_sp <- append(links_per_sp, ls/S)
-    
-    
-      if(length(visited_cells) %% 1000 == 0){
+      
+      
+      if(length(visited_cells) %% 5000 == 0){
         region$SPP <- 0
         region[which(region$PAGENAME %in% visited_cells),]$SPP <- 1
         
@@ -589,11 +618,29 @@ for(r in regions_order){
       }
       
     }
-    
-     
   }
+  
 }
 
+
+##### to plot the results indicating where each region ends we load the data
+##### on the number of cells per region
+
+cells_per_region <- read.csv('cells_per_region.csv')
+
+
+plot(species, pch=20, xlab='Area', ylab='Species', cex=.7, xaxt='n')
+colors <- rainbow(length(regions_order))
+cur_x <- 0
+cur_l <- 0
+for(idx in 1:length(regions_order)){
+  cur_x <- cur_x + cells_per_region[which(cells_per_region$region_name == regions_order[idx]),]$cell_count
+  abline(v=cur_x, col=colors[idx])  
+  
+  mtext(regions_order[idx], side=1, line=cur_l, at=cur_x, col=colors[idx], cex=0.8)
+  if(idx %% 4 == 0) cur_l <- 0
+  else cur_l <- cur_l + 0.7
+}
 
 
 
@@ -649,88 +696,147 @@ for(p in names(output_all_europe)){
 }
 
 
-#### this is for testing the maps!
 
 
-cur_cellid <- sample(cur_codes, 1)
+#### this code is for the network-area by habitats
+habitats <- names(pix.hab)[-1]
+region <- data.frame(PAGENAME = master$PAGENAME, SPP = 0)
 
-y_coord <- match(gsub("[0-9]", "", cur_cellid), latitudes);
-x_coord <- match(gsub("[A-Z]", "", cur_cellid), longitudes);
-
-x_index <- x_coord - 1;
-y_index <- y_coord - 1;
-
-x_count <- 1
-y_count <- 0
-
-x_next <- 1
-y_next <- 1
-
-x_offset <- -1
-y_offset <- 1
-
-cells_to_traverse <- length(cur_codes) #rows*cols
-traversed_cells <- 0
-
-visited_cells <- c()
-traversed_set <- c()
-
-while(length(visited_cells) < cells_to_traverse){
- 
-  cur_cellid <- paste0(latitudes[y_coord],longitudes[x_coord])
-  traversed_set <- append(traversed_set, cur_cellid)
+for(h in habitats){
+  region$SPP <- 0
+  habitat_cells <- pix.hab$PAGENAME[which(pix.hab[h] != 0)]
+  region[which(region$PAGENAME %in% habitat_cells),]$SPP <- 1
   
-  skip <- FALSE
+  habitat_raster <- fun.dbf2raster(SPPPA = region, mask.dir = "./mask10k/")
+  plot(habitat_raster, main=h)
   
-  if((! cur_cellid %in% cur_codes) | (cur_cellid %in% visited_cells)) skip <- TRUE
-  if(! skip){
-    if(is.na(sum(master[which(master$PAGENAME == cur_cellid),-1]))) skip <- TRUE
+  Sys.sleep(5)
+}
+
+
+##### to find out how many habitats there are in every bioregion we need 
+##### to go per bioregion and per habitat
+regions_order <- c('macaronesia', 'mediterranean', 'anatolian', 'blackSea', 'continental', 'pannonian', 'alpine', 'atlantic', 'steppic', 'boreal', 'arctic')
+
+#### This line is for going over the latitudinal gradient from north to south
+regions_order <- rev(regions_order)
+
+habitats <- names(pix.hab)[-1]
+
+#### create the data frame where we will store the results
+output_bioreg_habs <- matrix(0, nrow = length(regions_order), ncol=length(habitats))
+output_bioreg_habs <- as.data.frame(output_bioreg_habs)
+names(output_bioreg_habs) <- habitats
+output_bioreg_habs$region <- regions_order
+
+for(r in regions_order){
+  
+  if(r %in% regions_to_remove) next;
+  
+  i <- which(shape@data$short_name == r)
+  cur_pol <- shape[i,]
+  region_name <- as.character(shape@data[which(shape@data$PK_UID == i),]$code)
+  cur_ids <- extract(europeRaster, cur_pol)[[1]]
+  
+  cur_codes <- as.character(cells_info[which(cells_info$Value %in% cur_ids),]$PageName)
+  
+  region$SPP <- 0
+  region[which(region$PAGENAME %in% cur_codes),]$SPP <- 1
+  
+  bioregion_raster <- fun.dbf2raster(SPPPA = region, mask.dir = "./mask10k/")
+  
+  plot(bioregion_raster, main=region_name)
+  
+  for(h in habitats){
+    cells_in_habitat <- pix.hab$PAGENAME[which(pix.hab[h] != 0)]
+    if(length(intersect(cur_codes, cells_in_habitat)) > 0)  output_bioreg_habs[which(output_bioreg_habs$region == r),h] <- 1
   }
-  
-  if(! skip){
-    visited_cells <- append(visited_cells, cur_cellid)
-  }
-  
-  if(x_count > 0){
-    x_index = (x_index+x_offset) %% cols
-    x_coord <- x_index + 1;
-    x_count <- x_count - 1
-    
-    if(x_count == 0){
-      x_next <- x_next + 1
-      if(x_offset == 1) x_offset = -1
-      else if(x_offset == -1) x_offset = 1
-      y_count <- y_next
-      
-    }
-    
-  }else if(y_count > 0){
-    y_index <- (y_index + y_offset) %% rows
-    y_coord <- y_index + 1;
-    y_count <- y_count - 1
-    
-    if(y_count == 0){
-      y_next <- y_next + 1
-      if(y_offset == 1) y_offset <- -1
-      else if(y_offset == -1) y_offset <- 1
-      x_count <- x_next
-    }
-  }
-  
-  traversed_cells <- traversed_cells + 1
-  
-  print(traversed_cells)
-  
-  # if(traversed_cells %% 1000 == 0){
-  #   region$SPP <- 0
-  #   region[which(region$PAGENAME %in% traversed_set),]$SPP <- 1
-  #   
-  #   bioregion_raster <- fun.dbf2raster(SPPPA = region, mask.dir = "./mask10k/")
-  #   
-  #   plot(bioregion_raster, main=region_name)
-  # }
   
 }
+
+output_bioreg_habs$no_habs <- rowSums(output_bioreg_habs[,1:38])
+
+
+require(betapart)
+beta.multi(master)
+
+
+##### network area per habitat
+species <- c()
+connectances <- c()
+links <- c()
+links_per_sp <- c()
+
+visited_cells <- c()
+
+habitat <- data.frame(PAGENAME = master$PAGENAME, SPP = 0)
+for(h in habitats){
+  cur_codes <- pix.hab$PAGENAME[which(pix.hab[h] != 0)]
+  
+  #### number of cells per habitat
+  ### length(cur_codes), h
+  
+  habitat$SPP <- 0
+  habitat[which(habitat$PAGENAME %in% cur_codes),]$SPP <- 1
+  
+  habitat_raster <- fun.dbf2raster(SPPPA = habitat, mask.dir = "./mask10k/")
+  
+  plot(habitat_raster, main=h)
+  
+  
+  ### uncomment this for south-to-north gradient
+  #for(cur_cellid in (rev(cur_codes))){
+  
+  for(cur_cellid in rev((cur_codes))){
+    skip <- FALSE
+    
+    if((! cur_cellid %in% cur_codes) | (cur_cellid %in% visited_cells)) skip <- TRUE
+    if(! skip){
+      if(is.na(sum(master[which(master$PAGENAME == cur_cellid),-1]))){
+        skip <- TRUE
+      }
+    }
+    
+    if(is.na(sum(master[which(master$PAGENAME == cur_cellid),-1]))) skip <- TRUE
+    
+    if(! skip){
+      visited_cells <- append(visited_cells, cur_cellid)
+      
+      cur_comm <- master[which(master$PAGENAME %in% visited_cells),]
+      
+      cur_comm <- colSums(cur_comm[-1])
+      cur_comm[cur_comm > 1] <- 1
+      sum(cur_comm)
+      # Defining the species pool
+      sppSTRING <- names(cur_comm)[which(cur_comm == 1)]
+      
+      sppSTRING <- setdiff(sppSTRING, absent_species)
+      
+      # Sampling the metaweb
+      cur_web <- BARMdiet.binary[sppSTRING,sppSTRING] # Web adjacency matrix (predator x prey)
+      
+      S <- length(sppSTRING)
+      species <- append(species, S)
+      ls <- sum(cur_web)
+      links <- append(links, ls)
+      connectances <- append(connectances, (2*ls/((S-1)*S)))
+      links_per_sp <- append(links_per_sp, ls/S)
+      
+      
+      if(length(visited_cells) %% 5000 == 0){
+        habitat$SPP <- 0
+        habitat[which(habitat$PAGENAME %in% visited_cells),]$SPP <- 1
+        
+        habitat_raster <- fun.dbf2raster(SPPPA = habitat, mask.dir = "./mask10k/")
+        
+        plot(habitat_raster, main='visited so far')
+      }
+      
+    }
+  }
+  
+}
+
 
 
 ###### here we start with network analyses 
@@ -1002,24 +1108,3 @@ for(m in unique(output_netcarto$module)){
   pie(counts, labels = lbls, col=rainbow(length(lbls)),
       main=paste("Composition of regions in module", m+1))
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
