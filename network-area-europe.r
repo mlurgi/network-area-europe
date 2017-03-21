@@ -36,10 +36,17 @@ whois <- function(SPPCODE = NULL, SPPNAME = NULL) {
   if(!is.null(SPPCODE) & !is.null(SPPNAME)) stop("Must specify a species code or name(Genus_species)")
   
   SppID <- read.table(file = "SppID.txt", header = TRUE, stringsAsFactors = F)
- 
+
+  if(length(SPPCODE) > 1){
+    SPPCODE <- paste0(SPPCODE, "$", collapse = "|")
+  }
+  if(length(SPPNAME) > 1){
+    SPPNAME <- paste0(SPPNAME, "$", collapse = "|")
+  }
   
-  #### this should return something
-  
+  if(!is.null(SPPCODE))    who <- SppID[which(SppID$ID==SPPCODE),]$SPPname
+  if(!is.null(SPPNAME))    who <- SppID[grepl(pattern = SPPNAME,x = SppID$SPPname),]
+
   return(who)
 }
 
