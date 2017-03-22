@@ -155,8 +155,6 @@ pix.hab <- pix.hab[, c(1, which(names(pix.hab)%in% colnames(BARM.HAB)))]
 
 # end of Joao Braga's code
 
-
-
 ####### THIS IS WHERE THE NETWORK-AREA CODE BEGINS
 ####### This code was added to Joao's on the 12/10/2016
 
@@ -762,12 +760,9 @@ beta.multi(master)
 
 
 ##### network area per habitat
-species <- c()
-connectances <- c()
-links <- c()
-links_per_sp <- c()
 
-visited_cells <- c()
+
+output_per_habitat <- NULL
 
 habitat <- data.frame(PAGENAME = master$PAGENAME, SPP = 0)
 for(h in habitats){
@@ -783,9 +778,19 @@ for(h in habitats){
   
   plot(habitat_raster, main=h)
   
+  species_in_hab <- rownames(BARM.HAB)[which(BARM.HAB[h] == 1 | BARM.HAB[h] == 2)]
   
   ### uncomment this for south-to-north gradient
   #for(cur_cellid in (rev(cur_codes))){
+  
+  species <- c()
+  connectances <- c()
+  links <- c()
+  links_per_sp <- c()
+  cur_area <- 0
+  areas <- c()
+  
+  visited_cells <- c()
   
   for(cur_cellid in rev((cur_codes))){
     skip <- FALSE
@@ -810,7 +815,11 @@ for(h in habitats){
       # Defining the species pool
       sppSTRING <- names(cur_comm)[which(cur_comm == 1)]
       
+      # here the species that are not present in the food web are removed
       sppSTRING <- setdiff(sppSTRING, absent_species)
+      
+      # Additionally, we make sure to select only species in the current habitat
+      sppSTRING <- intersect(sppSTRING, species_in_hab)
       
       # Sampling the metaweb
       cur_web <- BARMdiet.binary[sppSTRING,sppSTRING] # Web adjacency matrix (predator x prey)
@@ -822,22 +831,22 @@ for(h in habitats){
       connectances <- append(connectances, (2*ls/((S-1)*S)))
       links_per_sp <- append(links_per_sp, ls/S)
       
-      
-      if(length(visited_cells) %% 5000 == 0){
-        habitat$SPP <- 0
-        habitat[which(habitat$PAGENAME %in% visited_cells),]$SPP <- 1
-        
-        habitat_raster <- fun.dbf2raster(SPPPA = habitat, mask.dir = "./mask10k/")
-        
-        plot(habitat_raster, main='visited so far')
-      }
+      cur_area <- cur_area + as.numeric(pix.hab[which(pix.hab$PAGENAME == cur_cellid),][h])
+      areas <- append(areas, cur_area)
       
     }
   }
   
+  cur_out <- data.frame(habitat=rep(h, length(species)), area=areas, species, links, links_per_sp, connectances)
+  
+  if(is.null(output_per_habitat)) output_per_habitat <- cur_out
+  else output_per_habitat <- rbind(output_per_habitat, cur_out)
+  
 }
 
+require(ggplot2)
 
+ggplot(subset(output_per_habitat, habitat == 'X13'), aes(area, species)) + geom_point()
 
 ###### here we start with network analyses 
 
