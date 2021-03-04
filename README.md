@@ -3,6 +3,7 @@
 Start here!
 
 Authors: Dr Miguel Lurgi
+
 Lecturer in Biosciences (Computational Ecology)
 Computational Ecology Lab - Department of Biosciences
 Swansea University, UK
@@ -15,6 +16,7 @@ Theoretical and Experimental Ecology Station, CNRS, France
 AND
 
 Dr Núria Galiana
+
 Centre for Biodiversity Theory and Modelling
 Theoretical and Experimental Ecology Station, CNRS, France
 
