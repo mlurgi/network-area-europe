@@ -4,13 +4,13 @@ Start here!
 
 Authors: Dr Miguel Lurgi
 
-Lecturer in Biosciences (Computational Ecology)
-Computational Ecology Lab - Department of Biosciences
+Lecturer in Biosciences (Computational Ecology) - 
+Computational Ecology Lab - Department of Biosciences, 
 Swansea University, UK
  
 and
 
-Centre for Biodiversity Theory and Modelling
+Centre for Biodiversity Theory and Modelling -
 Theoretical and Experimental Ecology Station, CNRS, France
 
 AND
